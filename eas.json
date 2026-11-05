@@ -16,6 +16,12 @@
       "android": {
         "buildType": "apk"
       }
+    },
+    "teste": {
+      "extends": "preview",
+      "env": {
+        "EXPO_PUBLIC_TELA_TESTE": "1"
+      }
     }
   }
 }

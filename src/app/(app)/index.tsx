@@ -9,6 +9,7 @@ import {
   PrimaryButton,
   ScreenContainer,
 } from '@/components';
+import { telaDeTesteLigada } from '@/features/teste/ligada';
 import { usePendencias } from '@/hooks/usePendencias';
 import { useEnvioStore } from '@/stores/envio-store';
 
@@ -61,6 +62,15 @@ export default function Inicio() {
         title="Os lançamentos chegam em breve"
         description="Por enquanto dá para conferir as configurações e o que aguarda envio."
       />
+
+      {telaDeTesteLigada() ? (
+        <PrimaryButton
+          label="Lançamento de teste"
+          className="mb-3"
+          onPress={() => router.push('/teste-lancamento')}
+          testID="inicio-teste"
+        />
+      ) : null}
 
       <PrimaryButton
         label="Configurações"
