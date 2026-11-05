@@ -214,6 +214,15 @@ export function criarRepositorio(banco: BancoSql) {
         : null;
     },
 
+    /** Só o horário: o motor consulta a cada lote, sem abrir o JSON inteiro. */
+    async lerInicioDoBootstrap(): Promise<string | null> {
+      const [linha] = await banco.getAllAsync<{ iniciado_em: string }>(
+        'SELECT iniciado_em FROM cache_bootstrap WHERE id = 1',
+        [],
+      );
+      return linha?.iniciado_em ?? null;
+    },
+
     salvarBootstrap(dados: Bootstrap, iniciadoEm: string) {
       return emTransacao(async () => {
         await banco.runAsync(
