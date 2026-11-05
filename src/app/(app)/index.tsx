@@ -2,7 +2,15 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Text, View } from 'react-native';
 import { obterRepositorio } from '@/banco';
-import { EmptyState, PrimaryButton, ScreenContainer } from '@/components';
+import {
+  EmptyState,
+  IndicadorEnvio,
+  OfflineStatusBanner,
+  PrimaryButton,
+  ScreenContainer,
+} from '@/components';
+import { usePendencias } from '@/hooks/usePendencias';
+import { useEnvioStore } from '@/stores/envio-store';
 
 const SEM_ESTOQUE_PADRAO = 'Sem estoque padrão';
 
@@ -10,6 +18,9 @@ const SEM_ESTOQUE_PADRAO = 'Sem estoque padrão';
 export default function Inicio() {
   const router = useRouter();
   const [estoque, setEstoque] = useState(SEM_ESTOQUE_PADRAO);
+  const { data } = usePendencias();
+  const conectado = useEnvioStore((estado) => estado.conectado && estado.servidorRespondeu);
+  const rodada = useEnvioStore((estado) => estado.rodada);
 
   useFocusEffect(
     useCallback(() => {
@@ -23,21 +34,32 @@ export default function Inicio() {
         );
         setEstoque(padrao?.nome ?? SEM_ESTOQUE_PADRAO);
       });
-    }, []),
+      // A rodada traz o bootstrap novo, que pode trazer o nome do estoque.
+    }, [rodada]),
   );
 
   return (
     <ScreenContainer>
-      <View className="mb-6">
+      <View className="mb-4">
         <Text className="font-sans-bold text-2xl leading-8 text-ink">Estoque 4A</Text>
         <Text className="mt-1 font-sans text-base leading-6 text-ink-secondary" testID="inicio-estoque">
           {estoque}
         </Text>
       </View>
 
+      <OfflineStatusBanner semConexao={!conectado} atualizadoEm={data?.atualizadoEm} />
+
+      <View className="mb-4">
+        <IndicadorEnvio
+          resumo={data?.resumo ?? { aguardando: 0, atencao: 0 }}
+          conectado={conectado}
+          aoAbrir={() => router.push('/pendencias')}
+        />
+      </View>
+
       <EmptyState
         title="Os lançamentos chegam em breve"
-        description="Por enquanto dá para conferir as configurações do aparelho."
+        description="Por enquanto dá para conferir as configurações e o que aguarda envio."
       />
 
       <PrimaryButton

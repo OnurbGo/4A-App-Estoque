@@ -7,7 +7,7 @@
     "start": "expo start --dev-client",
     "android": "expo start --android",
     "test": "jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "expo customize tsconfig.json && tsc --noEmit"
   },
   "dependencies": {
     "@expo-google-fonts/dm-sans": "^0.4.2",

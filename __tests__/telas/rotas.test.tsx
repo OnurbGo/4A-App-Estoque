@@ -7,6 +7,7 @@ import { repositorioEmMemoria } from '../banco/sqljs';
 import { servidorFalso } from '../services/servidor-falso';
 
 jest.mock('@/banco', () => ({ obterRepositorio: jest.fn() }));
+jest.mock('@/sync', () => ({ dispararEnvio: jest.fn(async () => undefined) }));
 jest.mock('@expo-google-fonts/dm-sans', () => ({
   DMSans_400Regular: 'DMSans_400Regular',
   DMSans_500Medium: 'DMSans_500Medium',
