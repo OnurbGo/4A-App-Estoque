@@ -15,7 +15,12 @@ describe('configuração do app', () => {
   });
 
   it('não pede notificações', () => {
-    expect(JSON.stringify(expo)).not.toMatch(/notification|RECEIVE_BOOT_COMPLETED|VIBRATE/i);
+    expect(JSON.stringify(expo)).not.toMatch(/notification|RECEIVE_BOOT_COMPLETED/i);
+    expect(expo.android.blockedPermissions).toContain('android.permission.VIBRATE');
+  });
+
+  it('não bloqueia o armazenamento: a câmera precisa dele até o Android 9', () => {
+    expect(JSON.stringify(expo.android.blockedPermissions)).not.toContain('EXTERNAL_STORAGE');
   });
 
   it('libera HTTP sem TLS para o IP do servidor', () => {

@@ -7,10 +7,15 @@
     "icon": "./assets/images/icon.png",
     "scheme": "estoque4a",
     "userInterfaceStyle": "light",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "android": {
       "package": "br.com.estoque4a.app",
       "allowBackup": false,
+      "blockedPermissions": [
+        "android.permission.VIBRATE"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#047857",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
