@@ -1,5 +1,5 @@
 import type { AnexoPendente } from '@/regras/fila';
-import { indicadorDeEnvio } from '@/regras/indicador';
+import { indicadorDeEnvio, motivoDaFalha } from '@/regras/indicador';
 import {
   montarPendencias,
   resumirPendencias,
@@ -207,6 +207,7 @@ describe('resumirPendencias e indicador', () => {
       estado: 'TUDO_ENVIADO',
       texto: 'Tudo enviado',
       atencao: null,
+      falha: null,
     });
   });
 
@@ -215,6 +216,7 @@ describe('resumirPendencias e indicador', () => {
       estado: 'AGUARDANDO',
       texto: '2 aguardando envio',
       atencao: null,
+      falha: null,
     });
   });
 
@@ -223,6 +225,7 @@ describe('resumirPendencias e indicador', () => {
       estado: 'SEM_CONEXAO',
       texto: 'Sem conexão',
       atencao: null,
+      falha: null,
     });
   });
 
@@ -257,5 +260,40 @@ describe('resumirPendencias e indicador', () => {
     ];
 
     expect(resumirPendencias(montarPendencias(operacoes, [anexo()])).aguardando).toBe(3);
+  });
+});
+
+describe('falha do pedido inteiro', () => {
+  const SEM_ACESSO = { statusCode: 403, mensagem: 'Esta conta não tem acesso aos tablets.' };
+  const SEM_REDE = { statusCode: 0, mensagem: 'Sem conexão com o servidor.' };
+  const resumo = { aguardando: 2, atencao: 0 };
+
+  it('mostra o motivo junto do que aguarda envio', () => {
+    expect(indicadorDeEnvio(resumo, true, SEM_ACESSO)).toEqual({
+      estado: 'AGUARDANDO',
+      texto: '2 aguardando envio',
+      atencao: null,
+      falha: 'Esta conta não tem acesso aos tablets.',
+    });
+  });
+
+  it('aparece mesmo sem nada para enviar: os cadastros também não atualizam', () => {
+    expect(indicadorDeEnvio({ aguardando: 0, atencao: 0 }, true, SEM_ACESSO)).toMatchObject({
+      texto: 'Tudo enviado',
+      falha: 'Esta conta não tem acesso aos tablets.',
+    });
+  });
+
+  it('sem rede, não repete o motivo: "Sem conexão" já diz', () => {
+    expect(motivoDaFalha(SEM_REDE, true)).toBeNull();
+  });
+
+  it('desconectado, não mostra um motivo que pode estar velho', () => {
+    expect(motivoDaFalha(SEM_ACESSO, false)).toBeNull();
+    expect(indicadorDeEnvio(resumo, false, SEM_ACESSO).falha).toBeNull();
+  });
+
+  it('sem falha, sem motivo', () => {
+    expect(motivoDaFalha(null, true)).toBeNull();
   });
 });

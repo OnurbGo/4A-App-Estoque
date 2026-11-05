@@ -11,7 +11,7 @@ import {
 } from '@/components';
 import { telaDeTesteLigada } from '@/features/teste/ligada';
 import { usePendencias } from '@/hooks/usePendencias';
-import { useEnvioStore } from '@/stores/envio-store';
+import { chegaAoServidor, useEnvioStore } from '@/stores/envio-store';
 
 const SEM_ESTOQUE_PADRAO = 'Sem estoque padrão';
 
@@ -20,7 +20,8 @@ export default function Inicio() {
   const router = useRouter();
   const [estoque, setEstoque] = useState(SEM_ESTOQUE_PADRAO);
   const { data } = usePendencias();
-  const conectado = useEnvioStore((estado) => estado.conectado && estado.servidorRespondeu);
+  const conectado = useEnvioStore(chegaAoServidor);
+  const falhaGeral = useEnvioStore((estado) => estado.ultimaFalha);
   const rodada = useEnvioStore((estado) => estado.rodada);
 
   useFocusEffect(
@@ -54,6 +55,7 @@ export default function Inicio() {
         <IndicadorEnvio
           resumo={data?.resumo ?? { aguardando: 0, atencao: 0 }}
           conectado={conectado}
+          falhaGeral={falhaGeral}
           aoAbrir={() => router.push('/pendencias')}
         />
       </View>

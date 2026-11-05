@@ -68,7 +68,7 @@ beforeEach(async () => {
   jest.mocked(dispararEnvio).mockClear();
   ({ repositorio } = await repositorioEmMemoria());
   banco.obterRepositorio.mockResolvedValue(repositorio);
-  useEnvioStore.setState({ conectado: true, servidorRespondeu: true, rodada: 0 });
+  useEnvioStore.setState({ conectado: true, ultimaFalha: null, rodada: 0 });
   process.env.EXPO_PUBLIC_TELA_TESTE = '1';
 });
 

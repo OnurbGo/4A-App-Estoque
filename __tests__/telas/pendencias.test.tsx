@@ -5,6 +5,7 @@ import Inicio from '@/app/(app)/index';
 import Pendencias from '@/app/(app)/pendencias';
 import type { Repositorio } from '@/banco';
 import type { NovaOperacao } from '@/regras/operacoes';
+import { ApiError } from '@/services/errors';
 import { useEnvioStore } from '@/stores/envio-store';
 import { dispararEnvio } from '@/sync';
 import { repositorioEmMemoria } from '../banco/sqljs';
@@ -62,7 +63,7 @@ beforeEach(async () => {
   jest.mocked(dispararEnvio).mockClear();
   ({ repositorio } = await repositorioEmMemoria());
   banco.obterRepositorio.mockResolvedValue(repositorio);
-  useEnvioStore.setState({ conectado: true, servidorRespondeu: true, rodada: 0 });
+  useEnvioStore.setState({ conectado: true, ultimaFalha: null, rodada: 0 });
 });
 
 describe('Pendências', () => {
@@ -184,10 +185,55 @@ describe('Pendências', () => {
         proxima_tentativa_em: null,
       },
     ]);
-    await act(async () => useEnvioStore.getState().registrarRodada(true));
+    await act(async () => useEnvioStore.getState().registrarRodada(null));
 
     await waitFor(() => expect(screen.queryByTestId('pendencia-a')).toBeNull());
     expect(screen.getByText('Nada aguardando envio')).toBeTruthy();
+  });
+});
+
+describe('falha do pedido inteiro', () => {
+  const SEM_ACESSO = new ApiError(403, 'Esta conta não tem acesso aos tablets.');
+
+  it('Pendências mostra o motivo e tranquiliza sobre o que foi lançado', async () => {
+    await repositorio.enfileirar(saida('a'), CRIADO_EM);
+    useEnvioStore.getState().registrarRodada(SEM_ACESSO);
+
+    await render(comQuery(<Pendencias />));
+
+    expect(await screen.findByTestId('indicador-falha')).toHaveTextContent(SEM_ACESSO.message);
+    expect(screen.getByTestId('pendencias-orientacao')).toHaveTextContent(/continua guardado/);
+    expect(await screen.findByText('1 aguardando envio')).toBeTruthy();
+  });
+
+  it('o início também mostra o motivo', async () => {
+    await repositorio.enfileirar(saida('a'), CRIADO_EM);
+    useEnvioStore.getState().registrarRodada(SEM_ACESSO);
+
+    await render(comQuery(<Inicio />));
+
+    expect(await screen.findByTestId('indicador-falha')).toHaveTextContent(SEM_ACESSO.message);
+  });
+
+  it('some quando uma rodada dá certo', async () => {
+    useEnvioStore.getState().registrarRodada(SEM_ACESSO);
+    await render(comQuery(<Pendencias />));
+    await screen.findByTestId('indicador-falha');
+
+    await act(async () => useEnvioStore.getState().registrarRodada(null));
+
+    expect(screen.queryByTestId('indicador-falha')).toBeNull();
+    expect(screen.queryByTestId('pendencias-orientacao')).toBeNull();
+  });
+
+  it('sem rede, fica só o Sem conexão', async () => {
+    useEnvioStore.getState().registrarRodada(new ApiError(0, 'Sem conexão com o servidor.'));
+
+    await render(comQuery(<Pendencias />));
+
+    expect(await screen.findByText('Sem conexão')).toBeTruthy();
+    expect(screen.queryByTestId('indicador-falha')).toBeNull();
+    expect(screen.queryByTestId('pendencias-orientacao')).toBeNull();
   });
 });
 
@@ -232,7 +278,10 @@ describe('Início', () => {
   });
 
   it('com Wi-Fi mas sem o servidor, também é Sem conexão', async () => {
-    useEnvioStore.setState({ conectado: true, servidorRespondeu: false });
+    useEnvioStore.setState({
+      conectado: true,
+      ultimaFalha: { statusCode: 0, mensagem: 'Sem conexão com o servidor.' },
+    });
 
     await render(comQuery(<Inicio />));
 

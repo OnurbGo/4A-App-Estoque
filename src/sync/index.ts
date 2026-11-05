@@ -19,7 +19,7 @@ function montarMotor(repositorio: Repositorio): Motor {
       nomeDoDispositivo(Device.modelName, await repositorio.obterIdDoAparelho(randomUUID)),
     agora: () => new Date(),
     aoTerminarRodada: (falha) => {
-      useEnvioStore.getState().registrarRodada(falha?.statusCode !== 0);
+      useEnvioStore.getState().registrarRodada(falha);
     },
   });
 }

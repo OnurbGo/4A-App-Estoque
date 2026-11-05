@@ -3,8 +3,9 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { EmptyState, IndicadorEnvio, PrimaryButton, ScreenContainer } from '@/components';
 import { usePendencias } from '@/hooks/usePendencias';
+import { motivoDaFalha } from '@/regras/indicador';
 import type { ItemPendencia, SituacaoPendencia } from '@/regras/pendencias';
-import { useEnvioStore } from '@/stores/envio-store';
+import { chegaAoServidor, useEnvioStore } from '@/stores/envio-store';
 import { dispararEnvio } from '@/sync';
 import { cn } from '@/utils/cn';
 import { formatDateTime } from '@/utils/format';
@@ -52,7 +53,8 @@ function CartaoPendencia({ item }: { item: ItemPendencia }) {
 export default function Pendencias() {
   const router = useRouter();
   const { data } = usePendencias();
-  const conectado = useEnvioStore((estado) => estado.conectado && estado.servidorRespondeu);
+  const conectado = useEnvioStore(chegaAoServidor);
+  const falhaGeral = useEnvioStore((estado) => estado.ultimaFalha);
   const [enviando, setEnviando] = useState(false);
 
   const itens = data?.itens ?? [];
@@ -72,7 +74,15 @@ export default function Pendencias() {
       <Text className="mb-4 font-sans-bold text-2xl leading-8 text-ink">Pendências</Text>
 
       <View className="mb-4">
-        <IndicadorEnvio resumo={resumo} conectado={conectado} />
+        <IndicadorEnvio resumo={resumo} conectado={conectado} falhaGeral={falhaGeral} />
+        {motivoDaFalha(falhaGeral, conectado) ? (
+          <Text
+            className="mt-2 font-sans-medium text-base leading-6 text-ink"
+            testID="pendencias-orientacao"
+          >
+            O que foi lançado continua guardado no aparelho. Se não resolver, avise o escritório.
+          </Text>
+        ) : null}
       </View>
 
       {itens.length === 0 ? (
