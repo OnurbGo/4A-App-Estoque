@@ -111,17 +111,28 @@ function itemDoResponsavel(operacao: OperacaoResponsavel): ItemPendencia {
   return { ...base, situacao: 'AGUARDANDO', orientacao: null };
 }
 
+const ORIENTACAO_DA_FOTO: Record<SituacaoPendencia, string | null> = {
+  RECUSADA: 'A foto não foi aceita. O lançamento foi registrado sem ela.',
+  PRESA: ORIENTACAO_PRESA,
+  AGUARDANDO: null,
+};
+
+function situacaoDaFoto({ status, tentativas }: AnexoPendente): SituacaoPendencia {
+  if (status === 'RECUSADO') return 'RECUSADA';
+  return tentativas >= TENTATIVAS_PARA_PRESA ? 'PRESA' : 'AGUARDANDO';
+}
+
 function itemDaFoto(anexo: AnexoPendente, lancamento: OperacaoLancamento | undefined): ItemPendencia {
-  const recusada = anexo.status === 'RECUSADO';
+  const situacao = situacaoDaFoto(anexo);
   return {
     id: anexo.client_id,
-    situacao: recusada ? 'RECUSADA' : 'AGUARDANDO',
+    situacao,
     titulo: lancamento
       ? `Foto · ${NOME_DO_TIPO[lancamento.dados.tipo]} · ${lancamento.nomes.responsavel}`
       : 'Foto de um lançamento',
     detalhe: lancamento ? detalheDoLancamento(lancamento) : 'Lançamento já enviado',
     mensagem: anexo.mensagem,
-    orientacao: recusada ? 'A foto não foi aceita. O lançamento foi registrado sem ela.' : null,
+    orientacao: ORIENTACAO_DA_FOTO[situacao],
     tentativas: anexo.tentativas,
     criado_em: anexo.criado_em,
     fotos: 0,

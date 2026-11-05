@@ -1,9 +1,10 @@
 import {
+  adiarAnexo,
   aplicarResultadoAnexo,
   aplicarResultados,
   escolherAnexos,
   escolherLote,
-  fotoRecusadaPeloServidor,
+  reacaoAFalhaDaFoto,
   recusarAnexo,
   TAMANHO_LOTE,
   type AnexoPendente,
@@ -309,11 +310,26 @@ describe('fotos', () => {
     });
   });
 
-  it('só 400 e 413 recusam a foto de vez', () => {
-    expect(fotoRecusadaPeloServidor(400)).toBe(true);
-    expect(fotoRecusadaPeloServidor(413)).toBe(true);
-    expect(fotoRecusadaPeloServidor(401)).toBe(false);
-    expect(fotoRecusadaPeloServidor(500)).toBe(false);
+  it.each([400, 413])('%i recusa a foto de vez: repetir não resolve', (status) => {
+    expect(reacaoAFalhaDaFoto(status)).toBe('RECUSAR');
+  });
+
+  it.each([0, 401, 403])('%i para a rodada: nenhuma outra foto passaria', (status) => {
+    expect(reacaoAFalhaDaFoto(status)).toBe('PARAR');
+  });
+
+  it.each([404, 500, 502, 503])('%i adia só esta foto', (status) => {
+    expect(reacaoAFalhaDaFoto(status)).toBe('ADIAR');
+  });
+
+  it('adiar conta a tentativa, guarda o motivo e espera mais a cada vez', () => {
+    expect(adiarAnexo(anexo({ tentativas: 2 }), 'O servidor teve um problema.', agora)).toEqual({
+      client_id: 'anexo-1',
+      status: 'PENDENTE',
+      tentativas: 3,
+      mensagem: 'O servidor teve um problema.',
+      proxima_tentativa_em: '2026-11-05T12:05:00.000Z',
+    });
   });
 
   it('guarda o motivo da recusa', () => {

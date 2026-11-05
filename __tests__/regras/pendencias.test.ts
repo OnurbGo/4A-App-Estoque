@@ -173,6 +173,26 @@ describe('montarPendencias', () => {
     expect(item?.orientacao).toMatch(/registrado sem ela/);
   });
 
+  it('foto que continua falhando aparece como PRESA, com o motivo', () => {
+    const operacao = lancamento({}, { client_id: 'lancamento-1', status: 'ENVIADO' });
+
+    const [item] = montarPendencias(
+      [operacao],
+      [anexo({ tentativas: TENTATIVAS_PARA_PRESA, mensagem: 'O servidor teve um problema.' })],
+    );
+
+    expect(item).toMatchObject({ situacao: 'PRESA', mensagem: 'O servidor teve um problema.' });
+    expect(item?.orientacao).toMatch(/continua sendo repetido/);
+  });
+
+  it('foto nas primeiras tentativas ainda só aguarda', () => {
+    const operacao = lancamento({}, { client_id: 'lancamento-1', status: 'ENVIADO' });
+
+    const [item] = montarPendencias([operacao], [anexo({ tentativas: 2 })]);
+
+    expect(item?.situacao).toBe('AGUARDANDO');
+  });
+
   it('não quebra com foto sem lançamento conhecido', () => {
     expect(montarPendencias([], [anexo()])[0]?.titulo).toBe('Foto de um lançamento');
   });

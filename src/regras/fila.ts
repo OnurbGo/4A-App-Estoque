@@ -158,21 +158,33 @@ export function aplicarResultadoAnexo(
   resultado: ResultadoAnexo,
   agora: Date,
 ): AlteracaoAnexo | null {
-  if (resultado !== 'AGUARDANDO_LANCAMENTO') return null;
+  return resultado === 'AGUARDANDO_LANCAMENTO' ? adiarAnexo(anexo, anexo.mensagem, agora) : null;
+}
 
+export type ReacaoAFalhaDaFoto = 'RECUSAR' | 'ADIAR' | 'PARAR';
+
+export function reacaoAFalhaDaFoto(statusHttp: number): ReacaoAFalhaDaFoto {
+  // Foto inválida, grande demais ou além do limite de 10: repetir o envio não resolve.
+  if (statusHttp === 400 || statusHttp === 413) return 'RECUSAR';
+  // Sem rede ou sem acesso, nenhuma outra foto passaria.
+  if (statusHttp === 0 || statusHttp === 401 || statusHttp === 403) return 'PARAR';
+  // Pode ser só desta foto: as outras e o bootstrap não podem ficar esperando por ela.
+  return 'ADIAR';
+}
+
+export function adiarAnexo(
+  anexo: AnexoPendente,
+  mensagem: string | null,
+  agora: Date,
+): AlteracaoAnexo {
   const tentativas = anexo.tentativas + 1;
   return {
     client_id: anexo.client_id,
     status: 'PENDENTE',
     tentativas,
-    mensagem: anexo.mensagem,
+    mensagem,
     proxima_tentativa_em: proximaTentativaEm(tentativas, agora),
   };
-}
-
-/** Foto inválida, grande demais ou além do limite de 10: repetir o envio não resolve. */
-export function fotoRecusadaPeloServidor(statusHttp: number): boolean {
-  return statusHttp === 400 || statusHttp === 413;
 }
 
 export function recusarAnexo(anexo: AnexoPendente, mensagem: string): AlteracaoAnexo {

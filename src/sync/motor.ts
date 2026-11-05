@@ -9,11 +9,12 @@ import {
   type Gatilho,
 } from '@/regras/agendamento';
 import {
+  adiarAnexo,
   aplicarResultadoAnexo,
   aplicarResultados,
   escolherAnexos,
   escolherLote,
-  fotoRecusadaPeloServidor,
+  reacaoAFalhaDaFoto,
   recusarAnexo,
   type ResultadoAnexo,
   type ResultadoOperacao,
@@ -99,20 +100,29 @@ export function criarMotor({
         continue;
       }
 
+      let resultado: ResultadoAnexo;
       try {
-        const resultado = await api.enviarFoto(anexo);
-        const alteracao = aplicarResultadoAnexo(anexo, resultado, agora());
-        if (alteracao) {
-          await repositorio.aplicarAlteracaoAnexo(alteracao);
-        } else {
-          // Nessa ordem: se o app cair aqui, sobra um arquivo solto, nunca um registro sem foto.
-          await repositorio.removerAnexo(anexo.client_id);
-          arquivos.apagar(anexo.caminho);
-        }
+        resultado = await api.enviarFoto(anexo);
       } catch (erro) {
         const falha = toFriendlyError(erro);
-        if (!fotoRecusadaPeloServidor(falha.statusCode)) throw falha;
-        await repositorio.aplicarAlteracaoAnexo(recusarAnexo(anexo, falha.message));
+        const reacao = reacaoAFalhaDaFoto(falha.statusCode);
+        if (reacao === 'PARAR') throw falha;
+
+        await repositorio.aplicarAlteracaoAnexo(
+          reacao === 'RECUSAR'
+            ? recusarAnexo(anexo, falha.message)
+            : adiarAnexo(anexo, falha.message, agora()),
+        );
+        continue;
+      }
+
+      const alteracao = aplicarResultadoAnexo(anexo, resultado, agora());
+      if (alteracao) {
+        await repositorio.aplicarAlteracaoAnexo(alteracao);
+      } else {
+        // Nessa ordem: se o app cair aqui, sobra um arquivo solto, nunca um registro sem foto.
+        await repositorio.removerAnexo(anexo.client_id);
+        arquivos.apagar(anexo.caminho);
       }
     }
   }

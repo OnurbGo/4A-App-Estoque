@@ -22,6 +22,8 @@ export function servidorDoTablet() {
     /** Erro do `POST /sync` inteiro. */
     sync: null as ApiError | null,
     foto: null as ApiError | null,
+    /** Erro só desta foto, pelo `client_id` dela. */
+    porFoto: new Map<string, ApiError>(),
     bootstrap: null as ApiError | null,
   };
 
@@ -79,6 +81,8 @@ export function servidorDoTablet() {
     },
     async enviarFoto(foto): Promise<ResultadoAnexo> {
       if (falhas.foto) throw falhas.foto;
+      const falhaDaFoto = falhas.porFoto.get(foto.client_id);
+      if (falhaDaFoto) throw falhaDaFoto;
       if (fotos.has(foto.client_id)) return 'JA_SINCRONIZADO';
       if (!lancamentos.has(foto.lancamento_client_id)) return 'AGUARDANDO_LANCAMENTO';
       fotos.set(foto.client_id, foto);

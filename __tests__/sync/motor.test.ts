@@ -473,13 +473,103 @@ describe('fotos', () => {
     expect(servidor.fotos.size).toBe(1);
   });
 
-  it('401 ou erro do servidor não recusa a foto', async () => {
+  it.each([
+    ['sem acesso', new ApiError(403, 'Esta conta não tem acesso aos tablets.')],
+    ['sessão encerrada', new ApiError(401, 'A senha da conta mudou. Entre de novo.')],
+    ['sem rede', SEM_REDE],
+  ])('%s para a rodada, sem gastar tentativa da foto', async (_nome, falha) => {
     await comFoto(lancamento('a'), 'foto-1');
-    servidor.falhas.foto = new ApiError(500, 'O servidor teve um problema.');
+    await comFoto(lancamento('b'), 'foto-2');
+    servidor.falhas.foto = falha;
 
     await motor.disparar('LANCAMENTO', true);
 
-    expect((await repositorio.listarAnexos())[0]?.status).toBe('PENDENTE');
+    expect(rodadas).toEqual([falha]);
+    expect(await repositorio.listarAnexos()).toEqual([
+      expect.objectContaining({ client_id: 'foto-1', status: 'PENDENTE', tentativas: 0 }),
+      expect.objectContaining({ client_id: 'foto-2', status: 'PENDENTE', tentativas: 0 }),
+    ]);
+  });
+
+  describe('erro do servidor em uma foto', () => {
+    const FALHA = new ApiError(500, 'O servidor teve um problema.');
+
+    beforeEach(async () => {
+      await repositorio.salvarBootstrap(bootstrapCom(13), agora.toISOString());
+      await comFoto(lancamento('a'), 'foto-ruim');
+      await comFoto(lancamento('b'), 'foto-boa');
+      servidor.falhas.porFoto.set('foto-ruim', FALHA);
+      await motor.disparar('LANCAMENTO', true);
+    });
+
+    const fotoRuim = async () =>
+      (await repositorio.listarAnexos()).find(({ client_id }) => client_id === 'foto-ruim');
+
+    it('não impede as outras fotos', () => {
+      expect(servidor.fotos.has('foto-boa')).toBe(true);
+    });
+
+    it('não impede o bootstrap', () => {
+      expect(servidor.contagem.bootstrap).toBe(1);
+    });
+
+    it('não vira falha geral: lançamentos novos não entram na espera', async () => {
+      expect(rodadas).toEqual([null]);
+
+      await emFila(lancamento('c'));
+      await motor.disparar('LANCAMENTO', true);
+
+      expect(await statusDe('c')).toBe('ENVIADO');
+    });
+
+    it('guarda o motivo e a tentativa na própria foto', async () => {
+      expect(await fotoRuim()).toMatchObject({
+        status: 'PENDENTE',
+        tentativas: 1,
+        mensagem: 'O servidor teve um problema.',
+        proxima_tentativa_em: '2026-11-05T12:01:00.000Z',
+      });
+    });
+
+    it('mantém o arquivo no aparelho', () => {
+      expect(arquivos.has('file:///anexos/foto-ruim.jpg')).toBe(true);
+    });
+
+    it('espera a vez dela e sobe quando o servidor voltar', async () => {
+      servidor.falhas.porFoto.clear();
+
+      await motor.disparar('TIMER', true);
+      expect(servidor.fotos.has('foto-ruim')).toBe(false);
+
+      passar(1);
+      await motor.disparar('TIMER', true);
+
+      expect(servidor.fotos.has('foto-ruim')).toBe(true);
+      expect(await fotoRuim()).toBeUndefined();
+    });
+
+    it('depois de 3 tentativas aparece como presa em Pendências', async () => {
+      for (const minutos of [1, 2]) {
+        passar(minutos);
+        await motor.disparar('TIMER', true);
+      }
+
+      const itens = montarPendencias(await operacoes(), await repositorio.listarAnexos());
+
+      expect(itens.find(({ id }) => id === 'foto-ruim')).toMatchObject({
+        situacao: 'PRESA',
+        mensagem: 'O servidor teve um problema.',
+        tentativas: 3,
+      });
+    });
+
+    it('abrir o app libera a foto na hora', async () => {
+      servidor.falhas.porFoto.clear();
+
+      await motor.disparar('ABRIR', true);
+
+      expect(servidor.fotos.has('foto-ruim')).toBe(true);
+    });
   });
 
   it('arquivo que sumiu vira foto recusada, sem travar a rodada', async () => {
