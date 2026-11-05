@@ -3,7 +3,7 @@ import { ImageManipulator } from 'expo-image-manipulator';
 import { apagarFoto, fotoExiste, guardarFoto, tirarFoto } from '@/services/fotos';
 
 const mockCriarPasta = jest.fn();
-const mockMover = jest.fn();
+const mockMover = jest.fn(async () => undefined);
 const mockApagar = jest.fn();
 let mockExiste = true;
 
@@ -108,6 +108,39 @@ describe('guardarFoto', () => {
     expect(caminho).toBe('file:///documentos/anexos/foto-1.jpg');
     expect(mockCriarPasta).toHaveBeenCalledWith({ idempotent: true, intermediates: true });
     expect(mockMover).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('guardarFoto e o arquivo no disco', () => {
+  const grande = { uri: 'file:///cache/foto.jpg', largura: 4000, altura: 3000 };
+
+  it('só devolve o caminho depois de a foto estar guardada', async () => {
+    let terminar = () => undefined as void;
+    mockMover.mockImplementationOnce(
+      () =>
+        new Promise<undefined>((resolver) => {
+          terminar = () => resolver(undefined);
+        }),
+    );
+    let devolveu = false;
+
+    const guardando = guardarFoto(grande, 'foto-1').then(() => {
+      devolveu = true;
+    });
+    await new Promise((resolver) => setTimeout(resolver, 0));
+
+    expect(mockMover).toHaveBeenCalledTimes(1);
+    expect(devolveu).toBe(false);
+
+    terminar();
+    await guardando;
+    expect(devolveu).toBe(true);
+  });
+
+  it('avisa quem chamou se não conseguir mover', async () => {
+    mockMover.mockRejectedValueOnce(new Error('Sem espaço'));
+
+    await expect(guardarFoto(grande, 'foto-1')).rejects.toThrow('Sem espaço');
   });
 });
 

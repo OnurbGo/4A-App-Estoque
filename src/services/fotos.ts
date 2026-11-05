@@ -36,7 +36,7 @@ export async function guardarFoto(foto: FotoTirada, clientId: string): Promise<s
   const { uri } = await imagem.saveAsync({ format: SaveFormat.JPEG, compress: QUALIDADE_JPEG });
 
   const destino = new File(pastaDasFotos(), `${clientId}.jpg`);
-  new File(uri).move(destino);
+  await new File(uri).move(destino);
   return destino.uri;
 }
 

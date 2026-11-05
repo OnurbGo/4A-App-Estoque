@@ -113,17 +113,21 @@ export function criarRepositorio(banco: BancoSql) {
      * Tudo que o saldo, os recentes, a fila e as Pendências precisam: o que não terminou, o que
      * foi enviado depois de `desde` e os lançamentos com foto a enviar.
      */
-    async listarOperacoesEmAberto(desde: string | null): Promise<OperacaoLocal[]> {
-      const linhas = await banco.getAllAsync<LinhaOperacao>(
-        `SELECT * FROM operacoes
-         WHERE status <> 'ENVIADO'
-            OR ? IS NULL
-            OR enviado_em > ?
-            OR client_id IN (SELECT lancamento_client_id FROM anexos_pendentes)
-         ORDER BY seq`,
-        [desde, desde],
-      );
-      return linhas.map(paraOperacao);
+    listarOperacoesEmAberto(desde: string | null): Promise<OperacaoLocal[]> {
+      // Na fila das escritas: fora dela, a mesma conexão enxerga um lançamento ainda sem commit,
+      // e o motor enviaria algo que um rollback tiraria do aparelho.
+      return emTransacao(async () => {
+        const linhas = await banco.getAllAsync<LinhaOperacao>(
+          `SELECT * FROM operacoes
+           WHERE status <> 'ENVIADO'
+              OR ? IS NULL
+              OR enviado_em > ?
+              OR client_id IN (SELECT lancamento_client_id FROM anexos_pendentes)
+           ORDER BY seq`,
+          [desde, desde],
+        );
+        return linhas.map(paraOperacao);
+      });
     },
 
     async buscarUltimaAplicacao(): Promise<OperacaoLocal | null> {

@@ -1,6 +1,6 @@
-import { criarTransacaoSerial } from '@/banco/banco-sql';
+import { criarTransacaoSerial, type BancoSql } from '@/banco/banco-sql';
 import { migrar, MIGRACOES } from '@/banco/migracoes';
-import type { Repositorio } from '@/banco/repositorio';
+import { criarRepositorio, type Repositorio } from '@/banco/repositorio';
 import type { NovaOperacao } from '@/regras/operacoes';
 import type { Bootstrap, OperacaoLancamento } from '@/regras/tipos';
 import { bancoEmMemoria, repositorioEmMemoria } from './sqljs';
@@ -340,6 +340,31 @@ describe('escritas ao mesmo tempo', () => {
 
     const chaves = await banco.getAllAsync<{ chave: string }>('SELECT chave FROM config', []);
     expect(chaves).toEqual([{ chave: 'lancamento' }]);
+  });
+
+  it('a fila não enxerga um lançamento que ainda pode ser desfeito', async () => {
+    const lento: BancoSql = {
+      ...banco,
+      runAsync: async (sql, parametros) => {
+        const resultado = await banco.runAsync(sql, parametros);
+        await new Promise((resolver) => setTimeout(resolver, 5));
+        return resultado;
+      },
+    };
+    const repositorioLento = criarRepositorio(lento);
+
+    const desfeito = expect(
+      repositorioLento.enfileirar(novoLancamento('a'), CRIADO_EM, [
+        { client_id: 'foto-1', caminho: 'file:///foto-1.jpg' },
+        { client_id: 'foto-1', caminho: 'file:///repetida.jpg' },
+      ]),
+    ).rejects.toThrow();
+    await new Promise((resolver) => setTimeout(resolver, 2));
+
+    const lidas = await repositorioLento.listarOperacoesEmAberto(null);
+
+    await desfeito;
+    expect(lidas).toEqual([]);
   });
 
   it('roda na ordem em que foi pedido', async () => {
